@@ -5,6 +5,7 @@ import {
   type DefaultSession,
 } from "next-auth";
 import DiscordProvider from "next-auth/providers/discord";
+import TwitterProvider from "next-auth/providers/twitter";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { env } from "../env/server.mjs";
 import { prisma } from "./db";
@@ -37,7 +38,11 @@ declare module "next-auth" {
  *
  * @see https://next-auth.js.org/configuration/options
  **/
+
 export const authOptions: NextAuthOptions = {
+  pages: {
+    signIn: "/auth/signin",
+  },
   callbacks: {
     session({ session, user }) {
       if (session.user) {
@@ -53,6 +58,30 @@ export const authOptions: NextAuthOptions = {
       clientId: env.DISCORD_CLIENT_ID,
       clientSecret: env.DISCORD_CLIENT_SECRET,
     }),
+    TwitterProvider({
+      clientId: env.TWITTER_CLIENT_ID,
+      clientSecret: env.TWITTER_CLIENT_SECRET,
+    }),
+    // CredentialsProvider({
+    //   name: "Credentials",
+    //   credentials: {},
+    //   authorize(credentials, req) {
+    //     const { email, password } = credentials as {
+    //       email: string;
+    //       password: string;
+    //     };
+
+    //     if (email !== "john@gmail.com" && password !== "123456") {
+    //       throw new Error("Invalid email or password");
+    //     }
+
+    //     return {
+    //       id: "1",
+    //       name: "John Doe",
+    //       email: "john@gmail.com",
+    //     };
+    //   },
+    // }),
     /**
      * ...add more providers here
      *
