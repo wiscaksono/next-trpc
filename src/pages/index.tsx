@@ -23,8 +23,7 @@ const Home: NextPage = ({
   const createNote = api.notes.createNotes.useMutation();
   const deleteNote = api.notes.deleteNotes.useMutation();
 
-  const handleClick = (e: React.FormEvent<HTMLInputElement>) => {
-    e.preventDefault();
+  const handleClick = () => {
     createNote.mutate({
       title: "TESTING",
       content: notes,
@@ -32,7 +31,8 @@ const Home: NextPage = ({
   };
 
   const handleDelete = (id: string) => {
-    deleteNote.mutate({ id: id });
+    const action = confirm("Yakin lu mo diapus?");
+    if (action) deleteNote.mutate({ id: id });
   };
 
   return (
@@ -71,7 +71,7 @@ const Home: NextPage = ({
             <input type="text" onChange={(e) => setNotes(e.target.value)} />
             <div className="mt-6">
               <button
-                onClick={(e) => void handleClick(e)}
+                onClick={() => handleClick()}
                 type="button"
                 className="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
               >
