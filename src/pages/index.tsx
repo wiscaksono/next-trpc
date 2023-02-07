@@ -2,38 +2,27 @@
 import type {
   GetServerSidePropsContext,
   InferGetServerSidePropsType,
-  NextPage,
 } from "next";
 
-import { PlusIcon } from "@heroicons/react/20/solid";
+import { Transition, Dialog } from "@headlessui/react";
 import { getServerSession } from "next-auth";
 import Head from "next/head";
-import { useState } from "react";
-import { authOptions } from "../server/auth";
-import { api } from "../utils/api";
+import { useState, Fragment, useRef } from "react";
+import { toast } from "react-hot-toast";
+
+import { PlusIcon } from "@heroicons/react/20/solid";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
 import Navbar from "../components/Navbar";
 
-const Home: NextPage = ({
+import { api } from "../utils/api";
+import { authOptions } from "../server/auth";
+
+const Home = ({
   user,
 }: InferGetServerSidePropsType<typeof getServerSession>) => {
-  const [notes, setNotes] = useState<string>("");
-
-  const { data: AllNotes } = api.notes.getNotes.useQuery();
-  const createNote = api.notes.createNotes.useMutation();
-  const deleteNote = api.notes.deleteNotes.useMutation();
-
-  const handleClick = () => {
-    createNote.mutate({
-      title: "TESTING",
-      content: notes,
-    });
-  };
-
-  const handleDelete = (id: string) => {
-    const action = confirm("Yakin lu mo diapus?");
-    if (action) deleteNote.mutate({ id: id });
-  };
+  const { data: allNotes } = api.notes.getNotes.useQuery();
+  console.log(allNotes);
 
   return (
     <>
@@ -44,61 +33,353 @@ const Home: NextPage = ({
       </Head>
       <main className="flex min-h-screen flex-col">
         <Navbar user={user} />
-
-        <section className="flex flex-1 items-center justify-center">
-          <div className="text-center">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                vectorEffect="non-scaling-stroke"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
-              />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">
-              No projects
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Get started by creating a new project.
-            </p>
-            <input type="text" onChange={(e) => setNotes(e.target.value)} />
-            <div className="mt-6">
-              <button
-                onClick={() => handleClick()}
-                type="button"
-                className="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-              >
-                <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-                New Project
-              </button>
-            </div>
-          </div>
-          <div>
-            {AllNotes?.map((note) => (
-              <div
-                key={note.id}
-                onClick={() => {
-                  handleDelete(note.id);
-                }}
-              >
-                <p>{note.content}</p>
-              </div>
+        {allNotes && allNotes.length > 0 ? (
+          <div className="grid grid-cols-12 gap-5 p-5">
+            {allNotes.map((note) => (
+              <NotesCard note={note} key={note.id} />
             ))}
           </div>
-        </section>
+        ) : (
+          <EmptyNotes />
+        )}
       </main>
     </>
   );
 };
 
 export default Home;
+
+const NotesCard = ({
+  note,
+}: {
+  note: { id: string; title: string; content: string };
+}) => {
+  const [openNote, setOpenNote] = useState<boolean>(false);
+
+  return (
+    <>
+      <article
+        className="w-full cursor-pointer rounded-lg border border-gray-300 p-4 shadow-sm transition hover:shadow-md sm:p-6"
+        onClick={() => void setOpenNote(true)}
+      >
+        <a href="#">
+          <h3 className="mt-0.5 truncate text-lg font-medium text-gray-900">
+            {note.title}
+          </h3>
+        </a>
+
+        <p className="mt-2 text-sm leading-relaxed text-gray-500 line-clamp-3">
+          {note.content}
+        </p>
+      </article>
+      <NoteModal openNote={openNote} setOpenNote={setOpenNote} note={note} />
+    </>
+  );
+};
+
+const NoteModal = ({
+  openNote,
+  setOpenNote,
+  note,
+}: {
+  openNote: boolean;
+  setOpenNote: (value: boolean) => void;
+  note: {
+    id: string;
+    title: string;
+    content: string;
+  };
+}) => {
+  const [data, setData] = useState<{
+    id: string;
+    title: string;
+    content: string;
+  }>(note);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [deleteModal, setDeleteModal] = useState<boolean>(false);
+  const updateNote = api.notes.updateNotes.useMutation();
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      updateNote.mutate({
+        id: data.id,
+        title: data.title,
+        content: data.content,
+      });
+      setOpenNote(false);
+      setLoading(false);
+      toast.success("Note updated successfully");
+    } catch (error: unknown) {
+      const errorMessage = (error as Error).toString();
+      toast.error(`Something went wrong: ${errorMessage}`);
+    }
+  };
+
+  return (
+    <>
+      <Transition appear show={openNote} as={Fragment}>
+        <Dialog
+          as="div"
+          className="relative z-10"
+          onClose={() => setOpenNote(false)}
+        >
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black bg-opacity-25" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                  <Dialog.Title
+                    as="h3"
+                    className="text-lg font-medium leading-6 text-gray-900"
+                  >
+                    Detail note
+                  </Dialog.Title>
+                  <form
+                    onSubmit={(e) => void handleSubmit(e)}
+                    className="mt-4 space-y-6"
+                  >
+                    <div>
+                      <label
+                        htmlFor="email"
+                        className="mb-2 block text-sm font-medium text-gray-500"
+                      >
+                        Title
+                      </label>
+                      <input
+                        type="text"
+                        name="email"
+                        id="email"
+                        className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                        required
+                        value={data.title}
+                        onChange={(e) =>
+                          setData({ ...data, title: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="email"
+                        className="mb-2 block text-sm font-medium text-gray-500"
+                      >
+                        Content
+                      </label>
+                      <textarea
+                        name="content"
+                        id="content"
+                        cols={30}
+                        rows={10}
+                        className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                        value={data.content}
+                        onChange={(e) =>
+                          setData({ ...data, content: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="mt-4">
+                      <button
+                        type="submit"
+                        className="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 transition-colors hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                        disabled={loading}
+                      >
+                        Update
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex justify-center rounded-md border border-transparent px-4 py-2 text-sm font-medium text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                        disabled={loading}
+                        onClick={() => void setDeleteModal(true)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </form>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+      <ConfirmDeleteModal
+        deleteModal={deleteModal}
+        setDeleteModal={setDeleteModal}
+        setOpenNote={setOpenNote}
+        id={data.id}
+      />
+    </>
+  );
+};
+
+const ConfirmDeleteModal = ({
+  deleteModal,
+  setDeleteModal,
+  setOpenNote,
+  id,
+}: {
+  deleteModal: boolean;
+  setDeleteModal: (value: boolean) => void;
+  setOpenNote: (value: boolean) => void;
+  id: string;
+}) => {
+  const [loading, setLoading] = useState<boolean>(false);
+  const cancelButtonRef = useRef(null);
+  const deleteNote = api.notes.deleteNotes.useMutation();
+
+  const handleDelete = () => {
+    setLoading(true);
+    try {
+      deleteNote.mutate({ id: id });
+      setLoading(false);
+      setDeleteModal(false);
+      setOpenNote(false);
+      toast.success("Note deleted successfully");
+    } catch (error: unknown) {
+      const errorMessage = (error as Error).toString();
+      toast.error(`Something went wrong: ${errorMessage}`);
+    }
+  };
+
+  return (
+    <Transition.Root show={deleteModal} as={Fragment}>
+      <Dialog
+        as="div"
+        className="relative z-10"
+        initialFocus={cancelButtonRef}
+        onClose={setDeleteModal}
+      >
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+        </Transition.Child>
+
+        <div className="fixed inset-0 z-10 overflow-y-auto">
+          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+              enterTo="opacity-100 translate-y-0 sm:scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 translate-y-0 sm:scale-100"
+              leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            >
+              <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <ExclamationTriangleIcon
+                        className="h-6 w-6 text-red-600"
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                      <Dialog.Title
+                        as="h3"
+                        className="text-lg font-medium leading-6 text-gray-900"
+                      >
+                        Delete this note?
+                      </Dialog.Title>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          Are you sure you want to delete this note? All of your
+                          data will be permanently removed. This action cannot
+                          be undone.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                  <button
+                    type="button"
+                    className="inline-flex w-full justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
+                    onClick={() => void handleDelete()}
+                    disabled={loading}
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    onClick={() => setDeleteModal(false)}
+                    ref={cancelButtonRef}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </Dialog.Panel>
+            </Transition.Child>
+          </div>
+        </div>
+      </Dialog>
+    </Transition.Root>
+  );
+};
+
+const EmptyNotes = () => {
+  return (
+    <section className="flex flex-1 items-center justify-center">
+      <div className="text-center">
+        <svg
+          className="mx-auto h-12 w-12 text-gray-400"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          aria-hidden="true"
+        >
+          <path
+            vectorEffect="non-scaling-stroke"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
+          />
+        </svg>
+        <h3 className="mt-2 text-sm font-medium text-gray-900">No projects</h3>
+        <p className="mt-1 text-sm text-gray-500">
+          Get started by creating a new project.
+        </p>
+        <div className="mt-6">
+          <button
+            type="button"
+            className="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          >
+            <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+            New Project
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+};
 
 export async function getServerSideProps(context: GetServerSidePropsContext) {
   const session = await getServerSession(context.req, context.res, authOptions);

@@ -7,6 +7,22 @@ export const notesRouter = createTRPCRouter({
     return ctx.prisma.notes.findMany();
   }),
 
+  findNotes: publicProcedure
+    .input(
+      z.object({
+        title: z.string().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.notes.findMany({
+        where: {
+          title: {
+            contains: input.title,
+          },
+        },
+      });
+    }),
+
   createNotes: publicProcedure
     .input(
       z.object({
@@ -17,6 +33,9 @@ export const notesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         await ctx.prisma.notes.create({
+          select: {
+            id: true,
+          },
           data: {
             title: input.title,
             content: input.content,

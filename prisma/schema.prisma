@@ -14,9 +14,10 @@ model Example {
 }
 
 model Notes {
-    id      String @id @default(cuid())
-    title   String
-    content String
+    id        String   @id @default(cuid())
+    title     String
+    content   String
+    createdAt DateTime @default(now())
 }
 
 // Necessary for Next auth
