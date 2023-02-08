@@ -30,9 +30,9 @@ export default function Navbar({
   const [newNote, setNewNote] = useState<boolean>(false);
   const [search, setSearch] = useState<string>("");
 
-  // const findNotes = api.notes.findNotes.useQuery({
-  //   title: search,
-  // });
+  const findNotes = api.notes.findNotes.useQuery({
+    title: search,
+  });
 
   return (
     <>

@@ -22,7 +22,6 @@ const Home = ({
   user,
 }: InferGetServerSidePropsType<typeof getServerSession>) => {
   const { data: allNotes } = api.notes.getNotes.useQuery();
-  console.log(allNotes);
 
   return (
     <>
@@ -34,7 +33,7 @@ const Home = ({
       <main className="flex min-h-screen flex-col">
         <Navbar user={user} />
         {allNotes && allNotes.length > 0 ? (
-          <div className="grid grid-cols-12 gap-5 p-5">
+          <div className="flex flex-wrap gap-2.5 p-5">
             {allNotes.map((note) => (
               <NotesCard note={note} key={note.id} />
             ))}
@@ -59,7 +58,7 @@ const NotesCard = ({
   return (
     <>
       <article
-        className="w-full cursor-pointer rounded-lg border border-gray-300 p-4 shadow-sm transition hover:shadow-md sm:p-6"
+        className="max-w-[15%] cursor-pointer rounded-lg border border-gray-300 p-4 shadow-sm transition hover:shadow-md sm:p-6"
         onClick={() => void setOpenNote(true)}
       >
         <a href="#">
